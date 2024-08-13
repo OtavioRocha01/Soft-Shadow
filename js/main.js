@@ -46,7 +46,7 @@ uniform vec3 u_reverseLightDirection;
 out vec4 outColor;
 
 // Number of samples for PCF (Percentage Closer Filtering)
-const int samples = 4;
+const int samples = 16;
 const float texelSize = 1.0 / 512.0; // Tamanho do texel baseado no tamanho da textura de sombra
 
 void main() {
@@ -261,7 +261,7 @@ function main() {
     projHeight: 10,
     perspective: false,
     fieldOfView: 120,
-    bias: -0.006,
+    bias: -0.025,
   };
   webglLessonsUI.setupUI(document.querySelector('#ui'), settings, [
     { type: 'slider',   key: 'cameraX',    min: -10, max: 10, change: render, precision: 2, step: 0.001, },
@@ -276,7 +276,7 @@ function main() {
     { type: 'slider',   key: 'projHeight', min:   0, max: 100, change: render, precision: 2, step: 0.001, },
     { type: 'checkbox', key: 'perspective', change: render, },
     { type: 'slider',   key: 'fieldOfView', min:  1, max: 179, change: render, },
-    { type: 'slider',   key: 'bias',       min:  -0.01, max: 0.00001, change: render, precision: 4, step: 0.0001, },
+    { type: 'slider',   key: 'bias',       min:  -0.05, max: 0.00001, change: render, precision: 4, step: 0.0001, },
   ]);
 
   const fieldOfViewRadians = degToRad(40);
