@@ -42,11 +42,10 @@ uniform sampler2D u_texture;
 uniform sampler2D u_projectedTexture;
 uniform float u_bias;
 uniform vec3 u_reverseLightDirection;
+uniform int u_samples; // Adiciona uma uniform para o número de samples
 
 out vec4 outColor;
 
-// Number of samples for PCF (Percentage Closer Filtering)
-const int samples = 16;
 const float texelSize = 1.0 / 512.0; // Tamanho do texel baseado no tamanho da textura de sombra
 
 void main() {
@@ -64,14 +63,14 @@ void main() {
 
   float shadowLight = 0.0;
   if (inRange) {
-    for (int x = -samples; x <= samples; ++x) {
-      for (int y = -samples; y <= samples; ++y) {
+    for (int x = -u_samples; x <= u_samples; ++x) {
+      for (int y = -u_samples; y <= u_samples; ++y) {
         vec2 offset = vec2(float(x), float(y)) * texelSize;
         float projectedDepth = texture(u_projectedTexture, projectedTexcoord.xy + offset).r;
         shadowLight += projectedDepth <= currentDepth ? 0.0 : 1.0;
       }
     }
-    shadowLight /= float((samples * 2 + 1) * (samples * 2 + 1));
+    shadowLight /= float((u_samples * 2 + 1) * (u_samples * 2 + 1));
   } else {
     shadowLight = 1.0;
   }
@@ -80,8 +79,7 @@ void main() {
   outColor = vec4(
       texColor.rgb * light * shadowLight,
       texColor.a);
-}
-`;
+}`;
 
 const colorVS = `#version 300 es
 in vec4 a_position;
@@ -109,7 +107,6 @@ void main() {
 `;
 
 function main() {
-  // Get A WebGL context
   /** @type {HTMLCanvasElement} */
   const canvas = document.querySelector('#canvas');
   const gl = canvas.getContext('webgl2');
@@ -117,12 +114,6 @@ function main() {
     return;
   }
 
-  // setup GLSL programs
-  // note: Since we're going to use the same VAO with multiple
-  // shader programs we need to make sure all programs use the
-  // same attribute locations. There are 2 ways to do that.
-  // (1) assign them in GLSL. (2) assign them by calling `gl.bindAttribLocation`
-  // before linking. We're using method 2 as it's more. D.R.Y.
   const programOptions = {
     attribLocations: {
       'a_position': 0,
@@ -134,8 +125,6 @@ function main() {
   const textureProgramInfo = twgl.createProgramInfo(gl, [vs, fs], programOptions);
   const colorProgramInfo = twgl.createProgramInfo(gl, [colorVS, colorFS], programOptions);
 
-  // Tell the twgl to match position with a_position,
-  // normal with a_normal etc..
   twgl.setAttributePrefix("a_");
 
   const sphereBufferInfo = twgl.primitives.createSphereBufferInfo(
@@ -262,6 +251,7 @@ function main() {
     perspective: false,
     fieldOfView: 120,
     bias: -0.025,
+    samples: 4,
   };
   webglLessonsUI.setupUI(document.querySelector('#ui'), settings, [
     { type: 'slider',   key: 'cameraX',    min: -10, max: 10, change: render, precision: 2, step: 0.001, },
@@ -277,11 +267,11 @@ function main() {
     { type: 'checkbox', key: 'perspective', change: render, },
     { type: 'slider',   key: 'fieldOfView', min:  1, max: 179, change: render, },
     { type: 'slider',   key: 'bias',       min:  -0.05, max: 0.00001, change: render, precision: 4, step: 0.0001, },
+    { type: 'slider',   key: 'samples',    min:  0, max: 32, change: render, precision: 2, step: 1, },
   ]);
 
   const fieldOfViewRadians = degToRad(40);
 
-  // Uniforms for each object.
   const planeUniforms = {
     u_colorMult: [0.5, 0.5, 1, 1],  // lightblue
     u_color: [1, 0, 0, 1],
@@ -312,9 +302,7 @@ function main() {
 
     gl.useProgram(programInfo.program);
 
-    // set uniforms that are the same for both the sphere and plane
-    // note: any values with no corresponding uniform in the shader
-    // are ignored.
+
     twgl.setUniforms(programInfo, {
       u_view: viewMatrix,
       u_projection: projectionMatrix,
@@ -322,6 +310,7 @@ function main() {
       u_textureMatrix: textureMatrix,
       u_projectedTexture: depthTexture,
       u_reverseLightDirection: lightWorldMatrix.slice(8, 11),
+      u_samples: settings.samples
     });
 
     // ------ Draw the sphere --------
