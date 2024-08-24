@@ -9,12 +9,15 @@
     <body>
         <canvas id="canvas"></canvas>
         <div id="uiContainer">
-            <div id="ui">
-            </div>
+            <button id="rotateCamera">Rotacionar Câmera</button>
+            <label for="sampleSlider">Número de Amostras: 
+                <span id="sampleValue">4</span>
+            </label>
+            <input type="range" id="sampleSlider"  min="0" max="32" step="1" value="4">
         </div>
-        <script src="https://webgl2fundamentals.org/webgl/resources/webgl-lessons-ui.js"></script>
         <script src="https://webgl2fundamentals.org/webgl/resources/twgl-full.min.js"></script>
         <script src="https://webgl2fundamentals.org/webgl/resources/m4.js"></script>
+        <script src="js/objParser.js"></script>
         <script src="js/main.js"></script>
     </body>
 </html>

@@ -40,20 +40,20 @@ in vec3 v_normal;
 uniform vec4 u_colorMult;
 uniform sampler2D u_texture;
 uniform sampler2D u_projectedTexture;
-uniform float u_bias;
 uniform vec3 u_reverseLightDirection;
 uniform int u_samples; // Adiciona uma uniform para o número de samples
 
 out vec4 outColor;
 
 const float texelSize = 1.0 / 512.0; // Tamanho do texel baseado no tamanho da textura de sombra
+const float bias = - 0.05; // Bias para evitar self-shadowing
 
 void main() {
   vec3 normal = normalize(v_normal);
   float light = dot(normal, u_reverseLightDirection);
 
   vec3 projectedTexcoord = v_projectedTexcoord.xyz / v_projectedTexcoord.w;
-  float currentDepth = projectedTexcoord.z + u_bias;
+  float currentDepth = projectedTexcoord.z + bias;
 
   bool inRange =
       projectedTexcoord.x >= 0.0 &&
@@ -106,7 +106,13 @@ void main() {
 }
 `;
 
-function main() {
+async function loadOBJ(url) {
+  const response = await fetch(url);
+  const text = await response.text();
+  return parseOBJ(text);
+}
+
+async function main() {
   /** @type {HTMLCanvasElement} */
   const canvas = document.querySelector('#canvas');
   const gl = canvas.getContext('webgl2');
@@ -119,13 +125,22 @@ function main() {
       'a_position': 0,
       'a_normal':   1,
       'a_texcoord': 2,
-      'a_color':    3,
     },
   };
   const textureProgramInfo = twgl.createProgramInfo(gl, [vs, fs], programOptions);
   const colorProgramInfo = twgl.createProgramInfo(gl, [colorVS, colorFS], programOptions);
 
   twgl.setAttributePrefix("a_");
+
+  const building = await loadOBJ('assets/low_poly_building.obj');
+
+  const bufferInfo = twgl.createBufferInfoFromArrays(gl, {
+    position: building.geometries[0].data.position,
+    texcoord: building.geometries[0].data.texcoord,
+    normal: building.geometries[0].data.normal,
+  });
+
+  const buildingVAO = twgl.createVAOFromBufferInfo(gl, textureProgramInfo, bufferInfo);
 
   const sphereBufferInfo = twgl.primitives.createSphereBufferInfo(
       gl,
@@ -248,27 +263,15 @@ function main() {
     targetZ: 3.5,
     projWidth: 10,
     projHeight: 10,
-    perspective: false,
-    fieldOfView: 120,
-    bias: -0.025,
     samples: 4,
   };
-  webglLessonsUI.setupUI(document.querySelector('#ui'), settings, [
-    { type: 'slider',   key: 'cameraX',    min: -10, max: 10, change: render, precision: 2, step: 0.001, },
-    { type: 'slider',   key: 'cameraY',    min:   1, max: 20, change: render, precision: 2, step: 0.001, },
-    { type: 'slider',   key: 'posX',       min: -10, max: 10, change: render, precision: 2, step: 0.001, },
-    { type: 'slider',   key: 'posY',       min:   1, max: 20, change: render, precision: 2, step: 0.001, },
-    { type: 'slider',   key: 'posZ',       min:   1, max: 20, change: render, precision: 2, step: 0.001, },
-    { type: 'slider',   key: 'targetX',    min: -10, max: 10, change: render, precision: 2, step: 0.001, },
-    { type: 'slider',   key: 'targetY',    min:   0, max: 20, change: render, precision: 2, step: 0.001, },
-    { type: 'slider',   key: 'targetZ',    min: -10, max: 20, change: render, precision: 2, step: 0.001, },
-    { type: 'slider',   key: 'projWidth',  min:   0, max: 100, change: render, precision: 2, step: 0.001, },
-    { type: 'slider',   key: 'projHeight', min:   0, max: 100, change: render, precision: 2, step: 0.001, },
-    { type: 'checkbox', key: 'perspective', change: render, },
-    { type: 'slider',   key: 'fieldOfView', min:  1, max: 179, change: render, },
-    { type: 'slider',   key: 'bias',       min:  -0.05, max: 0.00001, change: render, precision: 4, step: 0.0001, },
-    { type: 'slider',   key: 'samples',    min:  0, max: 32, change: render, precision: 2, step: 1, },
-  ]);
+  
+  const sampleValue = document.getElementById("sampleValue");
+  document.getElementById("sampleSlider").addEventListener("input", function() {
+    sampleValue.textContent = this.value;
+    settings.samples = parseInt(this.value);
+    render();
+  })
 
   const fieldOfViewRadians = degToRad(40);
 
@@ -306,7 +309,6 @@ function main() {
     twgl.setUniforms(programInfo, {
       u_view: viewMatrix,
       u_projection: projectionMatrix,
-      u_bias: settings.bias,
       u_textureMatrix: textureMatrix,
       u_projectedTexture: depthTexture,
       u_reverseLightDirection: lightWorldMatrix.slice(8, 11),
@@ -360,13 +362,7 @@ function main() {
         [settings.targetX, settings.targetY, settings.targetZ], // target
         [0, 1, 0],                                              // up
     );
-    const lightProjectionMatrix = settings.perspective
-        ? m4.perspective(
-            degToRad(settings.fieldOfView),
-            settings.projWidth / settings.projHeight,
-            0.5,  // near
-            10)   // far
-        : m4.orthographic(
+    const lightProjectionMatrix = m4.orthographic(
             -settings.projWidth / 2,   // left
              settings.projWidth / 2,   // right
             -settings.projHeight / 2,  // bottom
@@ -389,7 +385,7 @@ function main() {
     // now draw scene to the canvas projecting the depth texture into the scene
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-    gl.clearColor(0, 0, 0, 1);
+    gl.clearColor(0.2, 0.45, 0.8, 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
     let textureMatrix = m4.identity();
@@ -414,41 +410,18 @@ function main() {
     const up = [0, 1, 0];
     const cameraMatrix = m4.lookAt(cameraPosition, target, up);
 
+
     drawScene(
         projectionMatrix,
         cameraMatrix,
         textureMatrix,
         lightWorldMatrix,
         textureProgramInfo);
-
-    // ------ Draw the frustum ------
-    {
-      const viewMatrix = m4.inverse(cameraMatrix);
-
-      gl.useProgram(colorProgramInfo.program);
-
-      // Setup all the needed attributes.
-      gl.bindVertexArray(cubeLinesVAO);
-
-      // scale the cube in Z so it's really long
-      // to represent the texture is being projected to
-      // infinity
-      const mat = m4.multiply(
-          lightWorldMatrix, m4.inverse(lightProjectionMatrix));
-
-      // Set the uniforms we just computed
-      twgl.setUniforms(colorProgramInfo, {
-        u_color: [1, 1, 1, 1],
-        u_view: viewMatrix,
-        u_projection: projectionMatrix,
-        u_world: mat,
-      });
-
-      // calls gl.drawArrays or gl.drawElements
-      twgl.drawBufferInfo(gl, cubeLinesBufferInfo, gl.LINES);
-    }
+      
+    requestAnimationFrame(render);
   }
-  render();
+
+  requestAnimationFrame(render);
 }
 
 main();
