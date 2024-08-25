@@ -91,9 +91,9 @@ uniform mat4 u_world;
 void main() {
   // Multiply the position by the matrices.
   gl_Position = u_projection * u_view * u_world * a_position;
-}
-`;
-
+  }
+  `;
+  
 const colorFS = `#version 300 es
 precision highp float;
 
@@ -103,23 +103,33 @@ out vec4 outColor;
 
 void main() {
   outColor = u_color;
-}
-`;
-
-async function loadOBJ(url) {
-  const response = await fetch(url);
-  const text = await response.text();
-  return parseOBJ(text);
-}
-
-async function main() {
-  /** @type {HTMLCanvasElement} */
-  const canvas = document.querySelector('#canvas');
-  const gl = canvas.getContext('webgl2');
-  if (!gl) {
+  }
+  `;
+  
+  function main() {
+    /** @type {HTMLCanvasElement} */
+    const canvas = document.querySelector('#canvas');
+    const gl = canvas.getContext('webgl2');
+    if (!gl) {
     return;
   }
+  
+  var rotateButton = document.getElementById("rotateCamera");
 
+  rotateButton.onclick = function() {
+    if (cameraRotation == 0) {
+      cameraRotation = 0.01;
+    } else {
+      cameraRotation = 0;
+    }
+  };
+  
+  const sampleValue = document.getElementById("sampleValue");
+  document.getElementById("sampleSlider").addEventListener("input", function() {
+    sampleValue.textContent = this.value;
+    settings.samples = parseInt(this.value);
+  })
+  
   const programOptions = {
     attribLocations: {
       'a_position': 0,
@@ -132,19 +142,12 @@ async function main() {
 
   twgl.setAttributePrefix("a_");
 
-  const building = await loadOBJ('assets/low_poly_building.obj');
-
-  const bufferInfo = twgl.createBufferInfoFromArrays(gl, {
-    position: building.geometries[0].data.position,
-    texcoord: building.geometries[0].data.texcoord,
-    normal: building.geometries[0].data.normal,
-  });
-
-  const buildingVAO = twgl.createVAOFromBufferInfo(gl, textureProgramInfo, bufferInfo);
+  let cameraAngle = 0;
+  let cameraRotation = 0;
 
   const sphereBufferInfo = twgl.primitives.createSphereBufferInfo(
       gl,
-      1,  // radius
+      1.4,  // radius
       32, // subdivisions around
       24, // subdivisions down
   );
@@ -161,7 +164,7 @@ async function main() {
       gl, textureProgramInfo, planeBufferInfo);
   const cubeBufferInfo = twgl.primitives.createCubeBufferInfo(
       gl,
-      2,  // size
+      1.5,  // size
   );
   const cubeVAO = twgl.createVAOFromBufferInfo(
       gl, textureProgramInfo, cubeBufferInfo);
@@ -253,8 +256,6 @@ async function main() {
   }
 
   const settings = {
-    cameraX: 6,
-    cameraY: 12,
     posX: 2.5,
     posY: 4.8,
     posZ: 7,
@@ -266,14 +267,8 @@ async function main() {
     samples: 4,
   };
   
-  const sampleValue = document.getElementById("sampleValue");
-  document.getElementById("sampleSlider").addEventListener("input", function() {
-    sampleValue.textContent = this.value;
-    settings.samples = parseInt(this.value);
-    render();
-  })
 
-  const fieldOfViewRadians = degToRad(40);
+  const fieldOfViewRadians = degToRad(60);
 
   const planeUniforms = {
     u_colorMult: [0.5, 0.5, 1, 1],  // lightblue
@@ -287,12 +282,26 @@ async function main() {
     u_texture: checkerboardTexture,
     u_world: m4.translation(2, 3, 4),
   };
-  const cubeUniforms = {
-    u_colorMult: [0.5, 1, 0.5, 1],  // lightgreen
-    u_color: [0, 0, 1, 1],
-    u_texture: checkerboardTexture,
-    u_world: m4.translation(3, 1, 0),
-  };
+  const cubeUniformsArray = [
+    {
+      u_colorMult: [0.7, 0.7, 0.7, 1],  // lightgray
+      u_color: [0, 0, 1, 1],
+      u_texture: checkerboardTexture,
+      u_world: m4.translation(3, .8, 1.4),
+    },
+    {
+      u_colorMult: [0.7, 0.7, 0.7, 1],  // lighgray
+      u_color: [0, 0, 1, 1],
+      u_texture: checkerboardTexture,
+      u_world: m4.translation(1.2, .8, -1.4),
+    },
+    {
+      u_colorMult: [0.7, 0.7, 0.7, 1],  // lightgray
+      u_color: [0, 0, 1, 1],
+      u_texture: checkerboardTexture,
+      u_world: m4.translation(-.5, .8, 3),
+    },
+  ];
 
   function drawScene(
       projectionMatrix,
@@ -300,7 +309,7 @@ async function main() {
       textureMatrix,
       lightWorldMatrix,
       programInfo) {
-    // Make a view matrix from the camera matrix.
+    
     const viewMatrix = m4.inverse(cameraMatrix);
 
     gl.useProgram(programInfo.program);
@@ -316,47 +325,29 @@ async function main() {
     });
 
     // ------ Draw the sphere --------
-
-    // Setup all the needed attributes.
     gl.bindVertexArray(sphereVAO);
-
-    // Set the uniforms unique to the sphere
     twgl.setUniforms(programInfo, sphereUniforms);
-
-    // calls gl.drawArrays or gl.drawElements
     twgl.drawBufferInfo(gl, sphereBufferInfo);
 
-    // ------ Draw the cube --------
-
-    // Setup all the needed attributes.
+    // ------ Draw the cubes --------
     gl.bindVertexArray(cubeVAO);
-
-    // Set the uniforms unique to the cube
-    twgl.setUniforms(programInfo, cubeUniforms);
-
-    // calls gl.drawArrays or gl.drawElements
-    twgl.drawBufferInfo(gl, cubeBufferInfo);
+    cubeUniformsArray.forEach((cubeUniforms) => {
+      twgl.setUniforms(programInfo, cubeUniforms);
+      twgl.drawBufferInfo(gl, cubeBufferInfo);
+    });
 
     // ------ Draw the plane --------
-
-    // Setup all the needed attributes.
     gl.bindVertexArray(planeVAO);
-
-    // Set the uniforms unique to the cube
     twgl.setUniforms(programInfo, planeUniforms);
-
-    // calls gl.drawArrays or gl.drawElements
     twgl.drawBufferInfo(gl, planeBufferInfo);
   }
 
-  // Draw the scene.
   function render() {
     twgl.resizeCanvasToDisplaySize(gl.canvas);
 
     gl.enable(gl.CULL_FACE);
     gl.enable(gl.DEPTH_TEST);
 
-    // first draw from the POV of the light
     const lightWorldMatrix = m4.lookAt(
         [settings.posX, settings.posY, settings.posZ],          // position
         [settings.targetX, settings.targetY, settings.targetZ], // target
@@ -370,7 +361,6 @@ async function main() {
              0.5,                      // near
              10);                      // far
 
-    // draw to the depth texture
     gl.bindFramebuffer(gl.FRAMEBUFFER, depthFramebuffer);
     gl.viewport(0, 0, depthTextureSize, depthTextureSize);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -382,34 +372,37 @@ async function main() {
         lightWorldMatrix,
         colorProgramInfo);
 
-    // now draw scene to the canvas projecting the depth texture into the scene
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
     gl.clearColor(0.2, 0.45, 0.8, 1);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
+    cameraAngle += cameraRotation;
+
+    const radius = 15;
+    const cameraPosition = [
+      Math.cos(cameraAngle) * radius,
+      12, 
+      Math.sin(cameraAngle) * radius 
+    ];
+    const target = [0, 0, 0];
+    const up = [0, 1, 0];
+
+    const cameraMatrix = m4.lookAt(cameraPosition, target, up);
+
+
     let textureMatrix = m4.identity();
     textureMatrix = m4.translate(textureMatrix, 0.5, 0.5, 0.5);
     textureMatrix = m4.scale(textureMatrix, 0.5, 0.5, 0.5);
     textureMatrix = m4.multiply(textureMatrix, lightProjectionMatrix);
-    // use the inverse of this world matrix to make
-    // a matrix that will transform other positions
-    // to be relative this this world space.
+    
     textureMatrix = m4.multiply(
         textureMatrix,
         m4.inverse(lightWorldMatrix));
 
-    // Compute the projection matrix
     const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
     const projectionMatrix =
         m4.perspective(fieldOfViewRadians, aspect, 1, 2000);
-
-    // Compute the camera's matrix using look at.
-    const cameraPosition = [settings.cameraX, settings.cameraY, 15];
-    const target = [0, 0, 0];
-    const up = [0, 1, 0];
-    const cameraMatrix = m4.lookAt(cameraPosition, target, up);
-
 
     drawScene(
         projectionMatrix,
@@ -417,7 +410,7 @@ async function main() {
         textureMatrix,
         lightWorldMatrix,
         textureProgramInfo);
-      
+  
     requestAnimationFrame(render);
   }
 
