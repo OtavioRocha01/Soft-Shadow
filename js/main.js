@@ -41,12 +41,12 @@ uniform vec4 u_colorMult;
 uniform sampler2D u_texture;
 uniform sampler2D u_projectedTexture;
 uniform vec3 u_reverseLightDirection;
-uniform int u_samples; // Adiciona uma uniform para o número de samples
+uniform int u_samples; // uniform para o número de amostras
 
 out vec4 outColor;
 
-const float texelSize = 1.0 / 512.0; // Tamanho do texel baseado no tamanho da textura de sombra
-const float bias = - 0.05; // Bias para evitar self-shadowing
+const float texelSize = 1.0 / 512.0;
+const float bias = - 0.05;
 
 void main() {
   vec3 normal = normalize(v_normal);
