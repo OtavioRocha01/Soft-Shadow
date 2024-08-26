@@ -14,4 +14,4 @@ Geração de Soft Shadows com WebGL.
 
 Código como base retirado de https://webgl2fundamentals.org/webgl/lessons/webgl-shadows.html
 
-###### Link para o vídeo: https://drive.google.com/file/d/1E8IvYj1QLyDy5cj3d3Q73SOpqSUbDB9d/view?usp=sharing
+###### Link para o vídeo: https://drive.google.com/file/d/15vasG3tdOMsqUD6VzShw3MjVmj_V8NZd/view?usp=sharing
